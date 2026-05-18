@@ -150,10 +150,8 @@ object ChatTextSelection {
             val scaledLineHeight = (lineHeight * chatScale).toInt().coerceAtLeast(1)
             val scaledFontHeight = (textRenderer.fontHeight * chatScale).toInt().coerceAtLeast(1)
 
-            val lineTop = chatBottom - ((lineIndex + 1) * scaledLineHeight)
-
-            val y1 = lineTop + ((scaledLineHeight - scaledFontHeight) / 2) + 1
-            val y2 = y1 + scaledFontHeight
+            val y2 = chatBottom - (lineIndex * scaledLineHeight)
+            val y1 = y2 - scaledFontHeight
 
             context.fill(
                 min(x1, x2),
