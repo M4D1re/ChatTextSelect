@@ -5,15 +5,26 @@ import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.hud.ChatHudLine
 import net.minecraft.text.OrderedText
-import net.minecraft.text.StringVisitable
 import kotlin.math.max
 import kotlin.math.min
 
 object ChatTextSelection {
+    data class VisibleLine(
+        val id: LineId,
+        val text: String
+    )
+
+    data class LineId(
+        val addedTime: Int,
+        val endOfEntry: Boolean,
+        val text: String
+    )
+
     private data class Pos(
-        val lineText: String,
+        val lineId: LineId,
         val char: Int
     )
+
     private var selecting = false
     private var start: Pos? = null
     private var end: Pos? = null
@@ -24,16 +35,19 @@ object ChatTextSelection {
         end = null
     }
 
-    fun begin(lineText: String, char: Int) {
+    fun begin(lines: List<VisibleLine>, lineIndex: Int, char: Int) {
+        val line = lines.getOrNull(lineIndex) ?: return
+
         selecting = true
-        start = Pos(lineText, char)
-        end = Pos(lineText, char)
+        start = Pos(line.id, char)
+        end = Pos(line.id, char)
     }
 
-    fun drag(lineText: String, char: Int) {
-        if (selecting) {
-            end = Pos(lineText, char)
-        }
+    fun drag(lines: List<VisibleLine>, lineIndex: Int, char: Int) {
+        if (!selecting) return
+
+        val line = lines.getOrNull(lineIndex) ?: return
+        end = Pos(line.id, char)
     }
 
     fun finish() {
@@ -46,30 +60,29 @@ object ChatTextSelection {
         return a != b
     }
 
-    fun copyToClipboard(client: MinecraftClient, lines: List<String>) {
+    fun copyToClipboard(client: MinecraftClient, lines: List<VisibleLine>) {
         val text = getSelectedText(lines)
         if (text.isNotBlank()) {
             client.keyboard.clipboard = text
         }
     }
 
-    private fun resolvePos(pos: Pos, lines: List<String>): Pair<Int, Int>? {
-        val lineIndex = lines.indexOf(pos.lineText)
-        if (lineIndex == -1) return null
+    private fun resolvePos(pos: Pos, lines: List<VisibleLine>): Pair<Int, Int>? {
+        val index = lines.indexOfFirst { it.id == pos.lineId }
+        if (index == -1) return null
 
-        val safeChar = pos.char.coerceIn(0, pos.lineText.length)
-        return lineIndex to safeChar
+        val line = lines[index]
+        val safeChar = pos.char.coerceIn(0, line.text.length)
+
+        return index to safeChar
     }
 
-    fun getSelectedText(lines: List<String>): String {
+    fun getSelectedText(lines: List<VisibleLine>): String {
         val aRaw = start ?: return ""
         val bRaw = end ?: return ""
 
-        val aResolved = resolvePos(aRaw, lines) ?: return ""
-        val bResolved = resolvePos(bRaw, lines) ?: return ""
-
-        val a = aResolved
-        val b = bResolved
+        val a = resolvePos(aRaw, lines) ?: return ""
+        val b = resolvePos(bRaw, lines) ?: return ""
 
         val from: Pair<Int, Int>
         val to: Pair<Int, Int>
@@ -85,7 +98,7 @@ object ChatTextSelection {
         val result = StringBuilder()
 
         for (lineIndex in from.first..to.first) {
-            val line = lines.getOrNull(lineIndex) ?: continue
+            val line = lines.getOrNull(lineIndex)?.text ?: continue
 
             val startChar = if (lineIndex == from.first) from.second else 0
             val endChar = if (lineIndex == to.first) to.second else line.length
@@ -104,10 +117,11 @@ object ChatTextSelection {
 
         return result.toString()
     }
+
     fun renderSelection(
         context: DrawContext,
         textRenderer: TextRenderer,
-        lines: List<String>,
+        lines: List<VisibleLine>,
         chatLeft: Int,
         chatBottom: Int,
         lineHeight: Int,
@@ -131,7 +145,7 @@ object ChatTextSelection {
         }
 
         for (lineIndex in from.first..to.first) {
-            val line = lines.getOrNull(lineIndex) ?: continue
+            val line = lines.getOrNull(lineIndex)?.text ?: continue
 
             val startChar = if (lineIndex == from.first) from.second else 0
             val endChar = if (lineIndex == to.first) to.second else line.length
@@ -186,8 +200,20 @@ object ChatTextSelection {
 
         return line.length
     }
-    fun visibleLinesToPlainText(lines: List<ChatHudLine.Visible>): List<String> {
-        return lines.map { orderedTextToString(it.content()) }
+
+    fun visibleLinesToPlainText(lines: List<ChatHudLine.Visible>): List<VisibleLine> {
+        return lines.map {
+            val text = orderedTextToString(it.content())
+
+            VisibleLine(
+                id = LineId(
+                    addedTime = it.addedTime(),
+                    endOfEntry = it.endOfEntry(),
+                    text = text
+                ),
+                text = text
+            )
+        }
     }
 
     private fun orderedTextToString(orderedText: OrderedText): String {

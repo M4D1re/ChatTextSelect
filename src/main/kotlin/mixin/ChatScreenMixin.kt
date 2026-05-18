@@ -16,13 +16,14 @@ import ru.mrdire.chatselect.ChatTextSelection
 
 @Mixin(ChatScreen::class)
 abstract class ChatScreenMixin {
+
     @Unique
     private fun chatTextSelect_client(): MinecraftClient {
         return MinecraftClient.getInstance()
     }
 
     @Unique
-    private fun chatTextSelect_plainLines(): List<String> {
+    private fun chatTextSelect_plainLines(): List<ChatTextSelection.VisibleLine> {
         val client = chatTextSelect_client()
         val accessor = client.inGameHud.chatHud as ChatHudAccessor
 
@@ -51,12 +52,10 @@ abstract class ChatScreenMixin {
     @Unique
     private fun chatTextSelect_lineHeight(): Int {
         val client = chatTextSelect_client()
-
         val fontHeight = client.textRenderer.fontHeight
-
         val spacing = client.options.chatLineSpacing.value
 
-        return (fontHeight + spacing * 8.0).toInt()
+        return (fontHeight + spacing * 8.0).toInt().coerceAtLeast(fontHeight)
     }
 
     @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = true)
@@ -69,8 +68,8 @@ abstract class ChatScreenMixin {
 
         val client = chatTextSelect_client()
         val lines = chatTextSelect_plainLines()
-
         val scale = chatTextSelect_chatScale()
+
         val localX = (click.x() - chatTextSelect_chatLeft()) / scale
         val localYFromBottom = (chatTextSelect_chatBottom() - click.y()) / scale
 
@@ -80,14 +79,16 @@ abstract class ChatScreenMixin {
             lines.size
         ) ?: return
 
-        val line = lines[lineIndex]
+        val line = lines[lineIndex].text
+
         val charIndex = ChatTextSelection.mouseToChar(
             client.textRenderer,
             line,
             localX
         )
 
-        ChatTextSelection.begin(line, charIndex)
+        ChatTextSelection.begin(lines, lineIndex, charIndex)
+
         cir.returnValue = true
     }
 
@@ -133,7 +134,7 @@ abstract class ChatScreenMixin {
             )
 
             if (lineIndex != null) {
-                val line = lines[lineIndex]
+                val line = lines[lineIndex].text
 
                 val charIndex = ChatTextSelection.mouseToChar(
                     client.textRenderer,
@@ -141,7 +142,8 @@ abstract class ChatScreenMixin {
                     localX
                 )
 
-                ChatTextSelection.drag(line, charIndex)  }
+                ChatTextSelection.drag(lines, lineIndex, charIndex)
+            }
         }
 
         ChatTextSelection.renderSelection(
