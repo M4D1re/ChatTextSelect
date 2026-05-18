@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "ru.mrdire.chatselect.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ChatHudAccessor",
+    "ChatScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
