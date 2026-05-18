@@ -88,8 +88,7 @@ abstract class ChatScreenMixin {
             localX
         )
 
-        ChatTextSelection.begin(lineIndex, charIndex)
-
+        ChatTextSelection.begin(line, charIndex)
         cir.returnValue = true
     }
 
@@ -143,8 +142,7 @@ abstract class ChatScreenMixin {
                     localX
                 )
 
-                ChatTextSelection.drag(lineIndex, charIndex)
-            }
+                ChatTextSelection.drag(line, charIndex)  }
         }
 
         ChatTextSelection.renderSelection(

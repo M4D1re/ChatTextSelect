@@ -11,10 +11,9 @@ import kotlin.math.min
 
 object ChatTextSelection {
     private data class Pos(
-        val line: Int,
+        val lineText: String,
         val char: Int
     )
-
     private var selecting = false
     private var start: Pos? = null
     private var end: Pos? = null
@@ -25,15 +24,15 @@ object ChatTextSelection {
         end = null
     }
 
-    fun begin(line: Int, char: Int) {
+    fun begin(lineText: String, char: Int) {
         selecting = true
-        start = Pos(line, char)
-        end = Pos(line, char)
+        start = Pos(lineText, char)
+        end = Pos(lineText, char)
     }
 
-    fun drag(line: Int, char: Int) {
+    fun drag(lineText: String, char: Int) {
         if (selecting) {
-            end = Pos(line, char)
+            end = Pos(lineText, char)
         }
     }
 
@@ -42,9 +41,9 @@ object ChatTextSelection {
     }
 
     fun hasSelection(): Boolean {
-        val a = start
-        val b = end
-        return a != null && b != null && a != b
+        val a = start ?: return false
+        val b = end ?: return false
+        return a != b
     }
 
     fun copyToClipboard(client: MinecraftClient, lines: List<String>) {
@@ -54,14 +53,28 @@ object ChatTextSelection {
         }
     }
 
+    private fun resolvePos(pos: Pos, lines: List<String>): Pair<Int, Int>? {
+        val lineIndex = lines.indexOf(pos.lineText)
+        if (lineIndex == -1) return null
+
+        val safeChar = pos.char.coerceIn(0, pos.lineText.length)
+        return lineIndex to safeChar
+    }
+
     fun getSelectedText(lines: List<String>): String {
-        val a = start ?: return ""
-        val b = end ?: return ""
+        val aRaw = start ?: return ""
+        val bRaw = end ?: return ""
 
-        val from: Pos
-        val to: Pos
+        val aResolved = resolvePos(aRaw, lines) ?: return ""
+        val bResolved = resolvePos(bRaw, lines) ?: return ""
 
-        if (a.line < b.line || a.line == b.line && a.char <= b.char) {
+        val a = aResolved
+        val b = bResolved
+
+        val from: Pair<Int, Int>
+        val to: Pair<Int, Int>
+
+        if (a.first < b.first || a.first == b.first && a.second <= b.second) {
             from = a
             to = b
         } else {
@@ -71,11 +84,11 @@ object ChatTextSelection {
 
         val result = StringBuilder()
 
-        for (lineIndex in from.line..to.line) {
+        for (lineIndex in from.first..to.first) {
             val line = lines.getOrNull(lineIndex) ?: continue
 
-            val startChar = if (lineIndex == from.line) from.char else 0
-            val endChar = if (lineIndex == to.line) to.char else line.length
+            val startChar = if (lineIndex == from.first) from.second else 0
+            val endChar = if (lineIndex == to.first) to.second else line.length
 
             val safeStart = startChar.coerceIn(0, line.length)
             val safeEnd = endChar.coerceIn(0, line.length)
@@ -84,14 +97,13 @@ object ChatTextSelection {
                 result.append(line.substring(safeStart, safeEnd))
             }
 
-            if (lineIndex != to.line) {
+            if (lineIndex != to.first) {
                 result.append('\n')
             }
         }
 
         return result.toString()
     }
-
     fun renderSelection(
         context: DrawContext,
         textRenderer: TextRenderer,
@@ -102,13 +114,16 @@ object ChatTextSelection {
         textHeight: Int,
         chatScale: Double
     ) {
-        val a = start ?: return
-        val b = end ?: return
+        val aRaw = start ?: return
+        val bRaw = end ?: return
 
-        val from: Pos
-        val to: Pos
+        val a = resolvePos(aRaw, lines) ?: return
+        val b = resolvePos(bRaw, lines) ?: return
 
-        if (a.line < b.line || a.line == b.line && a.char <= b.char) {
+        val from: Pair<Int, Int>
+        val to: Pair<Int, Int>
+
+        if (a.first < b.first || a.first == b.first && a.second <= b.second) {
             from = a
             to = b
         } else {
@@ -116,12 +131,11 @@ object ChatTextSelection {
             to = a
         }
 
-        for (lineIndex in from.line..to.line) {
+        for (lineIndex in from.first..to.first) {
             val line = lines.getOrNull(lineIndex) ?: continue
 
-            val startChar = if (lineIndex == from.line) from.char else 0
-            val endChar = if (lineIndex == to.line) to.char else line.length
-
+            val startChar = if (lineIndex == from.first) from.second else 0
+            val endChar = if (lineIndex == to.first) to.second else line.length
             val safeStart = startChar.coerceIn(0, line.length)
             val safeEnd = endChar.coerceIn(0, line.length)
 
@@ -133,15 +147,21 @@ object ChatTextSelection {
             val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).toInt()
             val x2 = x1 + (textRenderer.getWidth(selected) * chatScale).toInt()
 
-            val y1 = chatBottom - ((lineIndex + 1) * lineHeight * chatScale).toInt()
-            val y2 = y1 + (textHeight * chatScale).toInt()
+            val scaledLineHeight = (lineHeight * chatScale).toInt()
+            val scaledTextHeight = (textHeight * chatScale).toInt()
+
+            val y1 = chatBottom -
+                    ((lineIndex + 1) * scaledLineHeight) +
+                    ((scaledLineHeight - scaledTextHeight) / 2)
+
+            val y2 = y1 + scaledTextHeight
 
             context.fill(
                 min(x1, x2),
                 y1,
                 max(x1, x2),
                 y2,
-                0x663399FF
+                0xAA4A90FF.toInt()
             )
         }
     }
