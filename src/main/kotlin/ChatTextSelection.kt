@@ -111,7 +111,6 @@ object ChatTextSelection {
         chatLeft: Int,
         chatBottom: Int,
         lineHeight: Int,
-        textHeight: Int,
         chatScale: Double
     ) {
         val aRaw = start ?: return
@@ -136,6 +135,7 @@ object ChatTextSelection {
 
             val startChar = if (lineIndex == from.first) from.second else 0
             val endChar = if (lineIndex == to.first) to.second else line.length
+
             val safeStart = startChar.coerceIn(0, line.length)
             val safeEnd = endChar.coerceIn(0, line.length)
 
@@ -145,23 +145,22 @@ object ChatTextSelection {
             val selected = line.substring(safeStart, safeEnd)
 
             val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).toInt()
-            val x2 = x1 + (textRenderer.getWidth(selected) * chatScale).toInt()
+            val x2 = chatLeft + (textRenderer.getWidth(before + selected) * chatScale).toInt()
 
-            val scaledLineHeight = (lineHeight * chatScale).toInt()
-            val scaledTextHeight = (textHeight * chatScale).toInt()
+            val scaledLineHeight = (lineHeight * chatScale).toInt().coerceAtLeast(1)
+            val scaledFontHeight = (textRenderer.fontHeight * chatScale).toInt().coerceAtLeast(1)
 
-            val y1 = chatBottom -
-                    ((lineIndex + 1) * scaledLineHeight) +
-                    ((scaledLineHeight - scaledTextHeight) / 2)
+            val lineTop = chatBottom - ((lineIndex + 1) * scaledLineHeight)
 
-            val y2 = y1 + scaledTextHeight
+            val y1 = lineTop + ((scaledLineHeight - scaledFontHeight) / 2) + 1
+            val y2 = y1 + scaledFontHeight
 
             context.fill(
                 min(x1, x2),
                 y1,
                 max(x1, x2),
                 y2,
-                0xAA4A90FF.toInt()
+                0xCC4A90FF.toInt()
             )
         }
     }

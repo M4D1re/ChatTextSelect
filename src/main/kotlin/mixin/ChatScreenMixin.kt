@@ -51,13 +51,12 @@ abstract class ChatScreenMixin {
     @Unique
     private fun chatTextSelect_lineHeight(): Int {
         val client = chatTextSelect_client()
-        return client.textRenderer.fontHeight + 1
-    }
 
-    @Unique
-    private fun chatTextSelect_textHeight(): Int {
-        val client = chatTextSelect_client()
-        return client.textRenderer.fontHeight
+        val fontHeight = client.textRenderer.fontHeight
+
+        val spacing = client.options.chatLineSpacing.value
+
+        return (fontHeight + spacing * 8.0).toInt()
     }
 
     @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = true)
@@ -152,7 +151,6 @@ abstract class ChatScreenMixin {
             chatTextSelect_chatLeft(),
             chatTextSelect_chatBottom(),
             chatTextSelect_lineHeight(),
-            chatTextSelect_textHeight(),
             scale
         )
     }
