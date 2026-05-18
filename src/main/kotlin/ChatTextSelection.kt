@@ -98,7 +98,9 @@ object ChatTextSelection {
         lines: List<String>,
         chatLeft: Int,
         chatBottom: Int,
-        lineHeight: Int
+        lineHeight: Int,
+        textHeight: Int,
+        chatScale: Double
     ) {
         val a = start ?: return
         val b = end ?: return
@@ -128,49 +130,45 @@ object ChatTextSelection {
             val before = line.substring(0, safeStart)
             val selected = line.substring(safeStart, safeEnd)
 
-            val x1 = chatLeft + textRenderer.getWidth(before)
-            val x2 = x1 + textRenderer.getWidth(selected)
+            val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).toInt()
+            val x2 = x1 + (textRenderer.getWidth(selected) * chatScale).toInt()
 
-            val y = chatBottom - (lineIndex + 1) * lineHeight
+            val y1 = chatBottom - ((lineIndex + 1) * lineHeight * chatScale).toInt()
+            val y2 = y1 + (textHeight * chatScale).toInt()
 
             context.fill(
                 min(x1, x2),
-                y,
+                y1,
                 max(x1, x2),
-                y + lineHeight,
+                y2,
                 0x663399FF
             )
         }
     }
 
     fun mouseToLine(
-        mouseY: Double,
-        chatBottom: Int,
+        localMouseYFromBottom: Double,
         lineHeight: Int,
         visibleLineCount: Int
     ): Int? {
-        val line = ((chatBottom - mouseY) / lineHeight).toInt()
+        val line = (localMouseYFromBottom / lineHeight).toInt()
         return if (line in 0 until visibleLineCount) line else null
     }
 
     fun mouseToChar(
         textRenderer: TextRenderer,
         line: String,
-        mouseX: Double,
-        chatLeft: Int
+        localMouseX: Double
     ): Int {
-        val localX = (mouseX - chatLeft).toInt()
-
-        if (localX <= 0) return 0
+        if (localMouseX <= 0.0) return 0
 
         for (i in 1..line.length) {
             val width = textRenderer.getWidth(line.substring(0, i))
-            if (width >= localX) return i
+            if (width >= localMouseX) return i
         }
 
         return line.length
     }
-
     fun visibleLinesToPlainText(lines: List<ChatHudLine.Visible>): List<String> {
         return lines.map { orderedTextToString(it.content()) }
     }

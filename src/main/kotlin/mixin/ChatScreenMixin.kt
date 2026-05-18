@@ -43,8 +43,21 @@ abstract class ChatScreenMixin {
     }
 
     @Unique
+    private fun chatTextSelect_chatScale(): Double {
+        val client = chatTextSelect_client()
+        return client.options.chatScale.value
+    }
+
+    @Unique
     private fun chatTextSelect_lineHeight(): Int {
-        return 9
+        val client = chatTextSelect_client()
+        return client.textRenderer.fontHeight + 1
+    }
+
+    @Unique
+    private fun chatTextSelect_textHeight(): Int {
+        val client = chatTextSelect_client()
+        return client.textRenderer.fontHeight
     }
 
     @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = true)
@@ -58,9 +71,12 @@ abstract class ChatScreenMixin {
         val client = chatTextSelect_client()
         val lines = chatTextSelect_plainLines()
 
+        val scale = chatTextSelect_chatScale()
+        val localX = (click.x() - chatTextSelect_chatLeft()) / scale
+        val localYFromBottom = (chatTextSelect_chatBottom() - click.y()) / scale
+
         val lineIndex = ChatTextSelection.mouseToLine(
-            click.y(),
-            chatTextSelect_chatBottom(),
+            localYFromBottom,
             chatTextSelect_lineHeight(),
             lines.size
         ) ?: return
@@ -69,8 +85,7 @@ abstract class ChatScreenMixin {
         val charIndex = ChatTextSelection.mouseToChar(
             client.textRenderer,
             line,
-            click.x(),
-            chatTextSelect_chatLeft()
+            localX
         )
 
         ChatTextSelection.begin(lineIndex, charIndex)
@@ -103,15 +118,18 @@ abstract class ChatScreenMixin {
     ) {
         val client = chatTextSelect_client()
         val lines = chatTextSelect_plainLines()
+        val scale = chatTextSelect_chatScale()
 
         if (GLFW.glfwGetMouseButton(
                 client.window.handle,
                 GLFW.GLFW_MOUSE_BUTTON_LEFT
             ) == GLFW.GLFW_PRESS
         ) {
+            val localX = (mouseX - chatTextSelect_chatLeft()) / scale
+            val localYFromBottom = (chatTextSelect_chatBottom() - mouseY) / scale
+
             val lineIndex = ChatTextSelection.mouseToLine(
-                mouseY.toDouble(),
-                chatTextSelect_chatBottom(),
+                localYFromBottom,
                 chatTextSelect_lineHeight(),
                 lines.size
             )
@@ -122,8 +140,7 @@ abstract class ChatScreenMixin {
                 val charIndex = ChatTextSelection.mouseToChar(
                     client.textRenderer,
                     line,
-                    mouseX.toDouble(),
-                    chatTextSelect_chatLeft()
+                    localX
                 )
 
                 ChatTextSelection.drag(lineIndex, charIndex)
@@ -136,7 +153,9 @@ abstract class ChatScreenMixin {
             lines,
             chatTextSelect_chatLeft(),
             chatTextSelect_chatBottom(),
-            chatTextSelect_lineHeight()
+            chatTextSelect_lineHeight(),
+            chatTextSelect_textHeight(),
+            scale
         )
     }
 }
