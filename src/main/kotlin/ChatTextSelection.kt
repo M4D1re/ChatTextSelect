@@ -1,5 +1,7 @@
 package ru.mrdire.chatselect
 
+import kotlin.math.roundToInt
+
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
@@ -28,16 +30,19 @@ object ChatTextSelection {
     private var selecting = false
     private var start: Pos? = null
     private var end: Pos? = null
+    private var lockedLineText: String? = null
 
     fun clear() {
         selecting = false
         start = null
         end = null
+        lockedLineText = null
     }
 
     fun begin(lines: List<VisibleLine>, lineIndex: Int, char: Int) {
         val line = lines.getOrNull(lineIndex) ?: return
 
+        lockedLineText = null
         selecting = true
         start = Pos(line.id, char)
         end = Pos(line.id, char)
@@ -47,6 +52,8 @@ object ChatTextSelection {
         if (!selecting) return
 
         val line = lines.getOrNull(lineIndex) ?: return
+
+        lockedLineText = null
         end = Pos(line.id, char)
     }
 
@@ -67,8 +74,56 @@ object ChatTextSelection {
         }
     }
 
+    fun selectWord(
+        lines: List<VisibleLine>,
+        lineIndex: Int,
+        charIndex: Int
+    ) {
+        val visibleLine = lines.getOrNull(lineIndex) ?: return
+        val line = visibleLine.text
+
+        if (line.isEmpty()) return
+
+        val safeIndex = charIndex.coerceIn(0, line.length - 1)
+
+        if (line[safeIndex].isWhitespace()) return
+
+        var startIndex = safeIndex
+        var endIndex = safeIndex
+
+        while (startIndex > 0 && !line[startIndex - 1].isWhitespace()) {
+            startIndex--
+        }
+
+        while (endIndex < line.length - 1 && !line[endIndex + 1].isWhitespace()) {
+            endIndex++
+        }
+
+        lockedLineText = line
+        start = Pos(visibleLine.id, startIndex)
+        end = Pos(visibleLine.id, endIndex + 1)
+        selecting = false
+    }
+
     private fun resolvePos(pos: Pos, lines: List<VisibleLine>): Pair<Int, Int>? {
-        val index = lines.indexOfFirst { it.id == pos.lineId }
+        val locked = lockedLineText
+
+        val index = when {
+            locked != null -> {
+                lines.indexOfFirst { it.text == locked }
+            }
+
+            else -> {
+                val byId = lines.indexOfFirst { it.id == pos.lineId }
+
+                if (byId != -1) {
+                    byId
+                } else {
+                    lines.indexOfFirst { it.text == pos.lineId.text }
+                }
+            }
+        }
+
         if (index == -1) return null
 
         val line = lines[index]
@@ -161,10 +216,9 @@ object ChatTextSelection {
             val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).toInt()
             val x2 = chatLeft + (textRenderer.getWidth(before + selected) * chatScale).toInt()
 
-            val scaledLineHeight = (lineHeight * chatScale).toInt().coerceAtLeast(1)
-            val scaledFontHeight = (textRenderer.fontHeight * chatScale).toInt().coerceAtLeast(1)
+            val scaledFontHeight = (textRenderer.fontHeight * chatScale).roundToInt().coerceAtLeast(1)
 
-            val y2 = chatBottom - (lineIndex * scaledLineHeight)
+            val y2 = chatBottom - (lineIndex * lineHeight * chatScale).roundToInt()
             val y1 = y2 - scaledFontHeight
 
             context.fill(
@@ -199,38 +253,6 @@ object ChatTextSelection {
         }
 
         return line.length
-    }
-
-    fun selectWord(
-        lines: List<VisibleLine>,
-        lineIndex: Int,
-        charIndex: Int
-    ) {
-        val line = lines.getOrNull(lineIndex)?.text ?: return
-
-        if (line.isEmpty()) return
-
-        val safeIndex = charIndex.coerceIn(0, line.length - 1)
-
-        if (line[safeIndex].isWhitespace()) return
-
-        var startIndex = safeIndex
-        var endIndex = safeIndex
-
-        while (startIndex > 0 && !line[startIndex - 1].isWhitespace()) {
-            startIndex--
-        }
-
-        while (endIndex < line.length - 1 && !line[endIndex + 1].isWhitespace()) {
-            endIndex++
-        }
-
-        val lineId = lines[lineIndex].id
-
-        start = Pos(lineId, startIndex)
-        end = Pos(lineId, endIndex + 1)
-
-        selecting = false
     }
 
     fun visibleLinesToPlainText(lines: List<ChatHudLine.Visible>): List<VisibleLine> {

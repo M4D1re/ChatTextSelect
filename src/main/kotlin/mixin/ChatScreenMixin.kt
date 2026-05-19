@@ -52,10 +52,8 @@ abstract class ChatScreenMixin {
     @Unique
     private fun chatTextSelect_lineHeight(): Int {
         val client = chatTextSelect_client()
-        val fontHeight = client.textRenderer.fontHeight
-        val spacing = client.options.chatLineSpacing.value
-
-        return (fontHeight + spacing * 8.0).toInt().coerceAtLeast(fontHeight)
+        val accessor = client.inGameHud.chatHud as ChatHudAccessor
+        return accessor.chatTextSelect_getLineHeight()
     }
 
     @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = true)
