@@ -201,6 +201,38 @@ object ChatTextSelection {
         return line.length
     }
 
+    fun selectWord(
+        lines: List<VisibleLine>,
+        lineIndex: Int,
+        charIndex: Int
+    ) {
+        val line = lines.getOrNull(lineIndex)?.text ?: return
+
+        if (line.isEmpty()) return
+
+        val safeIndex = charIndex.coerceIn(0, line.length - 1)
+
+        if (line[safeIndex].isWhitespace()) return
+
+        var startIndex = safeIndex
+        var endIndex = safeIndex
+
+        while (startIndex > 0 && !line[startIndex - 1].isWhitespace()) {
+            startIndex--
+        }
+
+        while (endIndex < line.length - 1 && !line[endIndex + 1].isWhitespace()) {
+            endIndex++
+        }
+
+        val lineId = lines[lineIndex].id
+
+        start = Pos(lineId, startIndex)
+        end = Pos(lineId, endIndex + 1)
+
+        selecting = false
+    }
+
     fun visibleLinesToPlainText(lines: List<ChatHudLine.Visible>): List<VisibleLine> {
         return lines.map {
             val text = orderedTextToString(it.content())

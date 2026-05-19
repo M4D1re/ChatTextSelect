@@ -34,7 +34,7 @@ abstract class ChatScreenMixin {
 
     @Unique
     private fun chatTextSelect_chatLeft(): Int {
-        return 4
+        return 3
     }
 
     @Unique
@@ -87,8 +87,19 @@ abstract class ChatScreenMixin {
             localX
         )
 
-        ChatTextSelection.begin(lines, lineIndex, charIndex)
-
+        if (doubled) {
+            ChatTextSelection.selectWord(
+                lines,
+                lineIndex,
+                charIndex
+            )
+        } else {
+            ChatTextSelection.begin(
+                lines,
+                lineIndex,
+                charIndex
+            )
+        }
         cir.returnValue = true
     }
 
