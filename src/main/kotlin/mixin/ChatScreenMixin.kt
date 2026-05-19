@@ -98,7 +98,6 @@ abstract class ChatScreenMixin {
                 charIndex
             )
         }
-        cir.returnValue = true
     }
 
     @Inject(method = ["keyPressed"], at = [At("HEAD")], cancellable = true)
