@@ -12,12 +12,23 @@ import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
-import ru.mrdire.chatselect.ChatTextSelection
 import ru.mrdire.chatselect.ChatTextSelectState
-
+import ru.mrdire.chatselect.ChatTextSelection
 
 @Mixin(ChatScreen::class)
 abstract class ChatScreenMixin {
+
+    @Unique
+    private var chatTextSelect_mouseDown = false
+
+    @Unique
+    private var chatTextSelect_startMouseX = 0.0
+
+    @Unique
+    private var chatTextSelect_startMouseY = 0.0
+
+    @Unique
+    private val chatTextSelect_dragThreshold = 5.0
 
     @Unique
     private fun chatTextSelect_client(): MinecraftClient {
@@ -36,7 +47,7 @@ abstract class ChatScreenMixin {
 
     @Unique
     private fun chatTextSelect_chatLeft(): Int {
-        return 3
+        return 1
     }
 
     @Unique
@@ -58,13 +69,12 @@ abstract class ChatScreenMixin {
         return accessor.chatTextSelect_getLineHeight()
     }
 
-    @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = true)
+    @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = false)
     private fun onMouseClicked(
         click: Click,
         doubled: Boolean,
         cir: CallbackInfoReturnable<Boolean>
     ) {
-
         if (!ChatTextSelectState.enabled) return
         if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return
 
@@ -96,7 +106,11 @@ abstract class ChatScreenMixin {
                 charIndex
             )
         } else {
-            ChatTextSelection.begin(
+            chatTextSelect_mouseDown = true
+            chatTextSelect_startMouseX = click.x()
+            chatTextSelect_startMouseY = click.y()
+
+            ChatTextSelection.prepare(
                 lines,
                 lineIndex,
                 charIndex
@@ -112,11 +126,7 @@ abstract class ChatScreenMixin {
         if (!ChatTextSelectState.enabled) return
 
         if (input.isCopy && ChatTextSelection.hasSelection()) {
-            ChatTextSelection.copyToClipboard(
-                chatTextSelect_client(),
-                chatTextSelect_plainLines()
-            )
-
+            ChatTextSelection.copyToClipboard(chatTextSelect_client())
             cir.returnValue = true
         }
     }
@@ -135,11 +145,16 @@ abstract class ChatScreenMixin {
         val lines = chatTextSelect_plainLines()
         val scale = chatTextSelect_chatScale()
 
-        if (GLFW.glfwGetMouseButton(
-                client.window.handle,
-                GLFW.GLFW_MOUSE_BUTTON_LEFT
-            ) == GLFW.GLFW_PRESS
-        ) {
+        val leftPressed = GLFW.glfwGetMouseButton(
+            client.window.handle,
+            GLFW.GLFW_MOUSE_BUTTON_LEFT
+        ) == GLFW.GLFW_PRESS
+
+        if (!leftPressed) {
+            chatTextSelect_mouseDown = false
+        }
+
+        if (leftPressed) {
             val localX = (mouseX - chatTextSelect_chatLeft()) / scale
             val localYFromBottom = (chatTextSelect_chatBottom() - mouseY) / scale
 
@@ -158,7 +173,20 @@ abstract class ChatScreenMixin {
                     localX
                 )
 
-                ChatTextSelection.drag(lines, lineIndex, charIndex)
+                val movedX = mouseX - chatTextSelect_startMouseX
+                val movedY = mouseY - chatTextSelect_startMouseY
+                val movedDistanceSq = movedX * movedX + movedY * movedY
+
+                if (
+                    chatTextSelect_mouseDown &&
+                    movedDistanceSq >= chatTextSelect_dragThreshold * chatTextSelect_dragThreshold
+                ) {
+                    ChatTextSelection.dragIfMoved(
+                        lines,
+                        lineIndex,
+                        charIndex
+                    )
+                }
             }
         }
 

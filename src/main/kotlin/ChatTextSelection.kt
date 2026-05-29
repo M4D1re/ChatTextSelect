@@ -1,14 +1,14 @@
 package ru.mrdire.chatselect
 
-import kotlin.math.roundToInt
-
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.font.TextRenderer
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.gui.hud.ChatHudLine
 import net.minecraft.text.OrderedText
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 object ChatTextSelection {
     data class VisibleLine(
@@ -17,8 +17,7 @@ object ChatTextSelection {
     )
 
     data class LineId(
-        val addedTime: Int,
-        val endOfEntry: Boolean,
+        val identityHash: Int,
         val text: String
     )
 
@@ -27,50 +26,70 @@ object ChatTextSelection {
         val char: Int
     )
 
+    private var pending = false
     private var selecting = false
+
     private var start: Pos? = null
     private var end: Pos? = null
-    private var lockedLineText: String? = null
+
+    private var selectedSnapshotText: String = ""
 
     fun clear() {
+        pending = false
         selecting = false
         start = null
         end = null
-        lockedLineText = null
+        selectedSnapshotText = ""
     }
 
-    fun begin(lines: List<VisibleLine>, lineIndex: Int, char: Int) {
+    fun prepare(lines: List<VisibleLine>, lineIndex: Int, char: Int) {
         val line = lines.getOrNull(lineIndex) ?: return
 
-        lockedLineText = null
-        selecting = true
+        pending = true
+        selecting = false
+
         start = Pos(line.id, char)
         end = Pos(line.id, char)
+
+        selectedSnapshotText = ""
     }
 
-    fun drag(lines: List<VisibleLine>, lineIndex: Int, char: Int) {
-        if (!selecting) return
-
+    fun dragIfMoved(
+        lines: List<VisibleLine>,
+        lineIndex: Int,
+        char: Int
+    ) {
+        val startPos = start ?: return
         val line = lines.getOrNull(lineIndex) ?: return
 
-        lockedLineText = null
+        if (pending) {
+            val sameLine = line.id.identityHash == startPos.lineId.identityHash
+            val movedEnough = !sameLine || abs(char - startPos.char) >= 2
+
+            if (!movedEnough) return
+
+            pending = false
+            selecting = true
+        }
+
+        if (!selecting) return
+
         end = Pos(line.id, char)
+        selectedSnapshotText = getSelectedText(lines)
     }
 
     fun finish() {
+        pending = false
         selecting = false
     }
 
     fun hasSelection(): Boolean {
-        val a = start ?: return false
-        val b = end ?: return false
-        return a != b
+        return selectedSnapshotText.isNotBlank()
     }
 
-    fun copyToClipboard(client: MinecraftClient, lines: List<VisibleLine>) {
-        val text = getSelectedText(lines)
-        if (text.isNotBlank()) {
-            client.keyboard.clipboard = text
+    fun copyToClipboard(client: MinecraftClient) {
+        if (selectedSnapshotText.isNotBlank()) {
+            client.keyboard.clipboard = selectedSnapshotText
         }
     }
 
@@ -99,28 +118,25 @@ object ChatTextSelection {
             endIndex++
         }
 
-        lockedLineText = line
         start = Pos(visibleLine.id, startIndex)
         end = Pos(visibleLine.id, endIndex + 1)
+
+        pending = false
         selecting = false
+
+        selectedSnapshotText = line.substring(startIndex, endIndex + 1)
     }
 
     private fun resolvePos(pos: Pos, lines: List<VisibleLine>): Pair<Int, Int>? {
-        val locked = lockedLineText
+        val byIdentity = lines.indexOfFirst {
+            it.id.identityHash == pos.lineId.identityHash
+        }
 
-        val index = when {
-            locked != null -> {
-                lines.indexOfFirst { it.text == locked }
-            }
-
-            else -> {
-                val byId = lines.indexOfFirst { it.id == pos.lineId }
-
-                if (byId != -1) {
-                    byId
-                } else {
-                    lines.indexOfFirst { it.text == pos.lineId.text }
-                }
+        val index = if (byIdentity != -1) {
+            byIdentity
+        } else {
+            lines.indexOfFirst {
+                it.text == pos.lineId.text
             }
         }
 
@@ -132,12 +148,12 @@ object ChatTextSelection {
         return index to safeChar
     }
 
-    fun getSelectedText(lines: List<VisibleLine>): String {
+    private fun getSelectedText(lines: List<VisibleLine>): String {
         val aRaw = start ?: return ""
         val bRaw = end ?: return ""
 
-        val a = resolvePos(aRaw, lines) ?: return ""
-        val b = resolvePos(bRaw, lines) ?: return ""
+        val a = resolvePos(aRaw, lines) ?: return selectedSnapshotText
+        val b = resolvePos(bRaw, lines) ?: return selectedSnapshotText
 
         val from: Pair<Int, Int>
         val to: Pair<Int, Int>
@@ -182,6 +198,8 @@ object ChatTextSelection {
         lineHeight: Int,
         chatScale: Double
     ) {
+        if (!hasSelection()) return
+
         val aRaw = start ?: return
         val bRaw = end ?: return
 
@@ -213,10 +231,12 @@ object ChatTextSelection {
             val before = line.substring(0, safeStart)
             val selected = line.substring(safeStart, safeEnd)
 
-            val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).toInt()
-            val x2 = chatLeft + (textRenderer.getWidth(before + selected) * chatScale).toInt()
+            val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).roundToInt()
+            val x2 = chatLeft + (textRenderer.getWidth(before + selected) * chatScale).roundToInt()
 
-            val scaledFontHeight = (textRenderer.fontHeight * chatScale).roundToInt().coerceAtLeast(1)
+            val scaledFontHeight = (textRenderer.fontHeight * chatScale)
+                .roundToInt()
+                .coerceAtLeast(1)
 
             val y2 = chatBottom - (lineIndex * lineHeight * chatScale).roundToInt()
             val y1 = y2 - scaledFontHeight
@@ -261,8 +281,7 @@ object ChatTextSelection {
 
             VisibleLine(
                 id = LineId(
-                    addedTime = it.addedTime(),
-                    endOfEntry = it.endOfEntry(),
+                    identityHash = System.identityHashCode(it),
                     text = text
                 ),
                 text = text
