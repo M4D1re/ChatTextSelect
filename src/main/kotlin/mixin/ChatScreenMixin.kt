@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 import ru.mrdire.chatselect.ChatTextSelection
+import ru.mrdire.chatselect.ChatTextSelectState
+
 
 @Mixin(ChatScreen::class)
 abstract class ChatScreenMixin {
@@ -62,6 +64,8 @@ abstract class ChatScreenMixin {
         doubled: Boolean,
         cir: CallbackInfoReturnable<Boolean>
     ) {
+
+        if (!ChatTextSelectState.enabled) return
         if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return
 
         val client = chatTextSelect_client()
@@ -105,6 +109,8 @@ abstract class ChatScreenMixin {
         input: KeyInput,
         cir: CallbackInfoReturnable<Boolean>
     ) {
+        if (!ChatTextSelectState.enabled) return
+
         if (input.isCopy && ChatTextSelection.hasSelection()) {
             ChatTextSelection.copyToClipboard(
                 chatTextSelect_client(),
@@ -123,6 +129,8 @@ abstract class ChatScreenMixin {
         deltaTicks: Float,
         ci: CallbackInfo
     ) {
+        if (!ChatTextSelectState.enabled) return
+
         val client = chatTextSelect_client()
         val lines = chatTextSelect_plainLines()
         val scale = chatTextSelect_chatScale()
