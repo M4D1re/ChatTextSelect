@@ -82,14 +82,19 @@ abstract class ChatScreenMixin {
         val lines = chatTextSelect_plainLines()
         val scale = chatTextSelect_chatScale()
 
+        val scrollOffset = chatTextSelect_scrollOffset()
+
         val localX = (click.x() - chatTextSelect_chatLeft()) / scale
         val localYFromBottom = (chatTextSelect_chatBottom() - click.y()) / scale
 
-        val lineIndex = ChatTextSelection.mouseToLine(
+        val visualLineIndex = ChatTextSelection.mouseToLine(
             localYFromBottom,
             chatTextSelect_lineHeight(),
             lines.size
         ) ?: return
+
+        val lineIndex = visualLineIndex + scrollOffset
+        if (lineIndex !in lines.indices) return
 
         val line = lines[lineIndex].text
 
@@ -131,6 +136,13 @@ abstract class ChatScreenMixin {
         }
     }
 
+    @Unique
+    private fun chatTextSelect_scrollOffset(): Int {
+        val client = chatTextSelect_client()
+        val accessor = client.inGameHud.chatHud as ChatHudAccessor
+        return accessor.chatTextSelect_getScrolledLines()
+    }
+
     @Inject(method = ["render"], at = [At("TAIL")])
     private fun onRender(
         context: DrawContext,
@@ -145,6 +157,8 @@ abstract class ChatScreenMixin {
         val lines = chatTextSelect_plainLines()
         val scale = chatTextSelect_chatScale()
 
+        val scrollOffset = chatTextSelect_scrollOffset()
+
         val leftPressed = GLFW.glfwGetMouseButton(
             client.window.handle,
             GLFW.GLFW_MOUSE_BUTTON_LEFT
@@ -158,11 +172,17 @@ abstract class ChatScreenMixin {
             val localX = (mouseX - chatTextSelect_chatLeft()) / scale
             val localYFromBottom = (chatTextSelect_chatBottom() - mouseY) / scale
 
-            val lineIndex = ChatTextSelection.mouseToLine(
+            val visualLineIndex = ChatTextSelection.mouseToLine(
                 localYFromBottom,
                 chatTextSelect_lineHeight(),
                 lines.size
             )
+
+            val lineIndex = if (visualLineIndex != null) {
+                visualLineIndex + scrollOffset
+            } else {
+                null
+            }
 
             if (lineIndex != null) {
                 val line = lines[lineIndex].text
@@ -197,7 +217,8 @@ abstract class ChatScreenMixin {
             chatTextSelect_chatLeft(),
             chatTextSelect_chatBottom(),
             chatTextSelect_lineHeight(),
-            scale
+            scale,
+            scrollOffset
         )
     }
 }

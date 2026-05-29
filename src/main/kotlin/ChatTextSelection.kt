@@ -196,7 +196,8 @@ object ChatTextSelection {
         chatLeft: Int,
         chatBottom: Int,
         lineHeight: Int,
-        chatScale: Double
+        chatScale: Double,
+        scrollOffset: Int
     ) {
         if (!hasSelection()) return
 
@@ -218,6 +219,9 @@ object ChatTextSelection {
         }
 
         for (lineIndex in from.first..to.first) {
+            val visualLineIndex = lineIndex - scrollOffset
+            if (visualLineIndex < 0) continue
+
             val line = lines.getOrNull(lineIndex)?.text ?: continue
 
             val startChar = if (lineIndex == from.first) from.second else 0
@@ -238,7 +242,7 @@ object ChatTextSelection {
                 .roundToInt()
                 .coerceAtLeast(1)
 
-            val y2 = chatBottom - (lineIndex * lineHeight * chatScale).roundToInt()
+            val y2 = chatBottom - (visualLineIndex * lineHeight * chatScale).roundToInt()
             val y1 = y2 - scaledFontHeight
 
             context.fill(
