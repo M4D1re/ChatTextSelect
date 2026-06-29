@@ -125,6 +125,22 @@ object ChatTextSelection {
         selectedSnapshotText = line.substring(startIndex, endIndex + 1)
     }
 
+    fun selectLine(
+        lines: List<VisibleLine>,
+        lineIndex: Int
+    ) {
+        val visibleLine = lines.getOrNull(lineIndex) ?: return
+        val line = visibleLine.text
+
+        start = Pos(visibleLine.id, 0)
+        end = Pos(visibleLine.id, line.length)
+
+        pending = false
+        selecting = false
+
+        selectedSnapshotText = line
+    }
+
     private fun resolvePos(pos: Pos, lines: List<VisibleLine>): Pair<Int, Int>? {
         val byIdentity = lines.indexOfFirst {
             it.id.identityHash == pos.lineId.identityHash

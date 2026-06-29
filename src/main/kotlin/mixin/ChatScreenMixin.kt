@@ -274,16 +274,15 @@ abstract class ChatScreenMixin {
                 lineIndex,
                 charIndex
             )
-        } else {
-            chatTextSelect_mouseDown = true
-            chatTextSelect_startMouseX = mouseX
-            chatTextSelect_startMouseY = mouseY
 
-            ChatTextSelection.prepare(
+            println("ChatTextSelect selected word")
+        } else {
+            ChatTextSelection.selectLine(
                 lines,
-                lineIndex,
-                charIndex
+                lineIndex
             )
+
+            println("ChatTextSelect selected line: ${line}")
         }
     }
 
@@ -323,12 +322,19 @@ abstract class ChatScreenMixin {
             "getModifiers"
         ) ?: 0
 
+        println("ChatTextSelect keyPressed: keyCode=$keyCode, modifiers=$modifiers")
+
         val isCopy = keyCode == GLFW.GLFW_KEY_C &&
                 modifiers and GLFW.GLFW_MOD_CONTROL != 0
 
-        if (isCopy && ChatTextSelection.hasSelection()) {
-            ChatTextSelection.copyToClipboard(chatTextSelect_client())
-            cir.returnValue = true
+        if (isCopy) {
+            println("ChatTextSelect Ctrl+C detected, hasSelection=${ChatTextSelection.hasSelection()}")
+
+            if (ChatTextSelection.hasSelection()) {
+                ChatTextSelection.copyToClipboard(chatTextSelect_client())
+                println("ChatTextSelect copied selection")
+                cir.returnValue = true
+            }
         }
     }
 
