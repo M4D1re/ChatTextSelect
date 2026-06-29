@@ -9,6 +9,7 @@ import org.lwjgl.glfw.GLFW
 
 class ChatTextSelectClient : ClientModInitializer {
     override fun onInitializeClient() {
+
         val toggleKey = KeyMappingHelper.registerKeyMapping(
             KeyMapping(
                 "key.chattextselect.toggle",
