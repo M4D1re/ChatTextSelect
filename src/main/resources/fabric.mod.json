@@ -4,7 +4,9 @@
   "version": "${version}",
   "name": "Chat Text Select",
   "description": "Позволяет выделять мышью и копировать текст из игрового чата.",
-  "authors": ["MrDire"],
+  "authors": [
+    "MrDire"
+  ],
   "environment": "client",
   "entrypoints": {
     "client": [
@@ -18,9 +20,9 @@
     "chattextselect.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.18.1",
+    "fabricloader": ">=0.19.3",
     "fabric-language-kotlin": "*",
-    "minecraft": "1.21.11",
+    "minecraft": "26.1.2",
     "fabric-api": "*"
   }
 }

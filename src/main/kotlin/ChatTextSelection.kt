@@ -1,10 +1,8 @@
 package ru.mrdire.chatselect
 
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.font.TextRenderer
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.gui.hud.ChatHudLine
-import net.minecraft.text.OrderedText
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.Font
+import net.minecraft.util.FormattedCharSequence
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -87,9 +85,9 @@ object ChatTextSelection {
         return selectedSnapshotText.isNotBlank()
     }
 
-    fun copyToClipboard(client: MinecraftClient) {
+    fun copyToClipboard(client: Minecraft) {
         if (selectedSnapshotText.isNotBlank()) {
-            client.keyboard.clipboard = selectedSnapshotText
+            client.keyboardHandler.clipboard = selectedSnapshotText
         }
     }
 
@@ -190,8 +188,8 @@ object ChatTextSelection {
     }
 
     fun renderSelection(
-        context: DrawContext,
-        textRenderer: TextRenderer,
+        graphics: Any,
+        font: Font,
         lines: List<VisibleLine>,
         chatLeft: Int,
         chatBottom: Int,
@@ -235,17 +233,18 @@ object ChatTextSelection {
             val before = line.substring(0, safeStart)
             val selected = line.substring(safeStart, safeEnd)
 
-            val x1 = chatLeft + (textRenderer.getWidth(before) * chatScale).roundToInt()
-            val x2 = chatLeft + (textRenderer.getWidth(before + selected) * chatScale).roundToInt()
+            val x1 = chatLeft + (font.width(before) * chatScale).roundToInt()
+            val x2 = chatLeft + (font.width(before + selected) * chatScale).roundToInt()
 
-            val scaledFontHeight = (textRenderer.fontHeight * chatScale)
+            val scaledFontHeight = (font.lineHeight * chatScale)
                 .roundToInt()
                 .coerceAtLeast(1)
 
             val y2 = chatBottom - (visualLineIndex * lineHeight * chatScale).roundToInt()
             val y1 = y2 - scaledFontHeight
 
-            context.fill(
+            fill(
+                graphics,
                 min(x1, x2),
                 y1,
                 max(x1, x2),
@@ -253,6 +252,23 @@ object ChatTextSelection {
                 0xCC4A90FF.toInt()
             )
         }
+    }
+
+    private fun fill(
+        graphics: Any,
+        x1: Int,
+        y1: Int,
+        x2: Int,
+        y2: Int,
+        color: Int
+    ) {
+        val method = graphics.javaClass.methods.firstOrNull {
+            it.name == "fill" &&
+                    it.parameterTypes.size == 5 &&
+                    it.parameterTypes.all { type -> type == Int::class.javaPrimitiveType }
+        } ?: return
+
+        method.invoke(graphics, x1, y1, x2, y2, color)
     }
 
     fun mouseToLine(
@@ -265,23 +281,23 @@ object ChatTextSelection {
     }
 
     fun mouseToChar(
-        textRenderer: TextRenderer,
+        font: Font,
         line: String,
         localMouseX: Double
     ): Int {
         if (localMouseX <= 0.0) return 0
 
         for (i in 1..line.length) {
-            val width = textRenderer.getWidth(line.substring(0, i))
+            val width = font.width(line.substring(0, i))
             if (width >= localMouseX) return i
         }
 
         return line.length
     }
 
-    fun visibleLinesToPlainText(lines: List<ChatHudLine.Visible>): List<VisibleLine> {
+    fun visibleLinesToPlainText(lines: List<Any>): List<VisibleLine> {
         return lines.map {
-            val text = orderedTextToString(it.content())
+            val text = visibleLineToString(it)
 
             VisibleLine(
                 id = LineId(
@@ -293,10 +309,22 @@ object ChatTextSelection {
         }
     }
 
-    private fun orderedTextToString(orderedText: OrderedText): String {
+    private fun visibleLineToString(line: Any): String {
+        val content = line.javaClass.methods
+            .firstOrNull { it.name == "content" && it.parameterCount == 0 }
+            ?.invoke(line)
+
+        if (content is FormattedCharSequence) {
+            return formattedTextToString(content)
+        }
+
+        return content?.toString() ?: line.toString()
+    }
+
+    private fun formattedTextToString(text: FormattedCharSequence): String {
         val builder = StringBuilder()
 
-        orderedText.accept { _, _, codePoint ->
+        text.accept { _, _, codePoint ->
             builder.appendCodePoint(codePoint)
             true
         }

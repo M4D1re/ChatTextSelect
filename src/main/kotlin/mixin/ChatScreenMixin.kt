@@ -1,10 +1,7 @@
 package ru.mrdire.chatselect.mixin
 
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.Click
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.gui.screen.ChatScreen
-import net.minecraft.client.input.KeyInput
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.ChatScreen
 import org.lwjgl.glfw.GLFW
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Unique
@@ -15,8 +12,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 import ru.mrdire.chatselect.ChatTextSelectState
 import ru.mrdire.chatselect.ChatTextSelection
 
+import net.minecraft.client.input.MouseButtonEvent
+import net.minecraft.client.input.KeyEvent
+
+import org.slf4j.LoggerFactory
+
 @Mixin(ChatScreen::class)
 abstract class ChatScreenMixin {
+
+//    companion object {
+//        private val LOGGER = LoggerFactory.getLogger("ChatTextSelect")
+//    }
 
     @Unique
     private var chatTextSelect_mouseDown = false
@@ -31,17 +37,28 @@ abstract class ChatScreenMixin {
     private val chatTextSelect_dragThreshold = 5.0
 
     @Unique
-    private fun chatTextSelect_client(): MinecraftClient {
-        return MinecraftClient.getInstance()
+    private var chatTextSelect_lastClickTime = 0L
+
+    @Unique
+    private var chatTextSelect_lastClickX = 0.0
+
+    @Unique
+    private var chatTextSelect_lastClickY = 0.0
+
+    @Unique
+    private fun chatTextSelect_client(): Minecraft {
+        return Minecraft.getInstance()
+    }
+
+    @Unique
+    private fun chatTextSelect_accessor(): ChatHudAccessor {
+        return chatTextSelect_client().gui.chat as ChatHudAccessor
     }
 
     @Unique
     private fun chatTextSelect_plainLines(): List<ChatTextSelection.VisibleLine> {
-        val client = chatTextSelect_client()
-        val accessor = client.inGameHud.chatHud as ChatHudAccessor
-
         return ChatTextSelection.visibleLinesToPlainText(
-            accessor.chatTextSelect_getVisibleMessages()
+            chatTextSelect_accessor().chatTextSelect_getTrimmedMessages()
         )
     }
 
@@ -53,30 +70,177 @@ abstract class ChatScreenMixin {
     @Unique
     private fun chatTextSelect_chatBottom(): Int {
         val client = chatTextSelect_client()
-        return client.window.scaledHeight - 40
+        return client.window.guiScaledHeight - 40
     }
 
     @Unique
     private fun chatTextSelect_chatScale(): Double {
-        val client = chatTextSelect_client()
-        return client.options.chatScale.value
+        return chatTextSelect_accessor().chatTextSelect_getScale()
     }
 
     @Unique
     private fun chatTextSelect_lineHeight(): Int {
-        val client = chatTextSelect_client()
-        val accessor = client.inGameHud.chatHud as ChatHudAccessor
-        return accessor.chatTextSelect_getLineHeight()
+        return chatTextSelect_accessor().chatTextSelect_getLineHeight()
+    }
+
+    @Unique
+    private fun chatTextSelect_scrollOffset(): Int {
+        return chatTextSelect_accessor().chatTextSelect_getChatScrollbarPos()
+    }
+
+    @Unique
+    private fun chatTextSelect_isDoubleClick(mouseX: Double, mouseY: Double): Boolean {
+        val now = System.currentTimeMillis()
+
+        val dx = mouseX - chatTextSelect_lastClickX
+        val dy = mouseY - chatTextSelect_lastClickY
+        val distanceSq = dx * dx + dy * dy
+
+        val result = now - chatTextSelect_lastClickTime <= 350L && distanceSq <= 25.0
+
+        chatTextSelect_lastClickTime = now
+        chatTextSelect_lastClickX = mouseX
+        chatTextSelect_lastClickY = mouseY
+
+        return result
+    }
+
+    @Unique
+    private fun chatTextSelect_mouseEventDouble(
+        event: Any,
+        vararg names: String
+    ): Double? {
+        for (name in names) {
+            val method = event.javaClass.methods.firstOrNull {
+                it.name == name && it.parameterCount == 0
+            }
+
+            val value = method?.invoke(event)
+
+            if (value is Number) {
+                return value.toDouble()
+            }
+        }
+
+        for (field in event.javaClass.declaredFields) {
+            if (field.name in names) {
+                field.isAccessible = true
+                val value = field.get(event)
+
+                if (value is Number) {
+                    return value.toDouble()
+                }
+            }
+        }
+
+        return null
+    }
+
+    @Unique
+    private fun chatTextSelect_mouseEventInt(
+        event: Any,
+        vararg names: String
+    ): Int? {
+        for (name in names) {
+            val method = event.javaClass.methods.firstOrNull {
+                it.name == name && it.parameterCount == 0
+            }
+
+            val value = method?.invoke(event)
+
+            if (value is Number) {
+                return value.toInt()
+            }
+        }
+
+        for (field in event.javaClass.declaredFields) {
+            if (field.name in names) {
+                field.isAccessible = true
+                val value = field.get(event)
+
+                if (value is Number) {
+                    return value.toInt()
+                }
+            }
+        }
+
+        return null
+    }
+
+    @Unique
+    private fun chatTextSelect_keyEventInt(
+        event: Any,
+        vararg names: String
+    ): Int? {
+        for (name in names) {
+            val method = event.javaClass.methods.firstOrNull {
+                it.name == name && it.parameterCount == 0
+            }
+
+            val value = method?.invoke(event)
+
+            if (value is Number) {
+                return value.toInt()
+            }
+        }
+
+        for (field in event.javaClass.declaredFields) {
+            if (field.name in names) {
+                field.isAccessible = true
+                val value = field.get(event)
+
+                if (value is Number) {
+                    return value.toInt()
+                }
+            }
+        }
+
+        return null
     }
 
     @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = false)
     private fun onMouseClicked(
-        click: Click,
+        event: MouseButtonEvent,
         doubled: Boolean,
         cir: CallbackInfoReturnable<Boolean>
     ) {
         if (!ChatTextSelectState.enabled) return
-        if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return
+
+        val mouseX = chatTextSelect_mouseEventDouble(
+            event,
+            "x",
+            "mouseX",
+            "getX",
+            "getMouseX"
+        ) ?: return
+
+        val mouseY = chatTextSelect_mouseEventDouble(
+            event,
+            "y",
+            "mouseY",
+            "getY",
+            "getMouseY"
+        ) ?: return
+
+        val button = chatTextSelect_mouseEventInt(
+            event,
+            "button",
+            "key",
+            "getButton",
+            "buttonId"
+        ) ?: return
+
+//        LOGGER.info(
+//            "ChatTextSelect mouseClicked: x={}, y={}, button={}, doubled={}",
+//            mouseX,
+//            mouseY,
+//            button,
+//            doubled
+//        )
+
+        println("ChatTextSelect mouseClicked: x=$mouseX, y=$mouseY, button=$button, doubled=$doubled")
+
+        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return
 
         val client = chatTextSelect_client()
         val lines = chatTextSelect_plainLines()
@@ -84,8 +248,8 @@ abstract class ChatScreenMixin {
 
         val scrollOffset = chatTextSelect_scrollOffset()
 
-        val localX = (click.x() - chatTextSelect_chatLeft()) / scale
-        val localYFromBottom = (chatTextSelect_chatBottom() - click.y()) / scale
+        val localX = (mouseX - chatTextSelect_chatLeft()) / scale
+        val localYFromBottom = (chatTextSelect_chatBottom() - mouseY) / scale
 
         val visualLineIndex = ChatTextSelection.mouseToLine(
             localYFromBottom,
@@ -99,7 +263,7 @@ abstract class ChatScreenMixin {
         val line = lines[lineIndex].text
 
         val charIndex = ChatTextSelection.mouseToChar(
-            client.textRenderer,
+            client.font,
             line,
             localX
         )
@@ -112,8 +276,8 @@ abstract class ChatScreenMixin {
             )
         } else {
             chatTextSelect_mouseDown = true
-            chatTextSelect_startMouseX = click.x()
-            chatTextSelect_startMouseY = click.y()
+            chatTextSelect_startMouseX = mouseX
+            chatTextSelect_startMouseY = mouseY
 
             ChatTextSelection.prepare(
                 lines,
@@ -123,102 +287,118 @@ abstract class ChatScreenMixin {
         }
     }
 
+//    @Inject(method = ["mouseReleased"], at = [At("HEAD")], cancellable = false)
+//    private fun onMouseReleased(
+//        mouseX: Double,
+//        mouseY: Double,
+//        button: Int,
+//        cir: CallbackInfoReturnable<Boolean>
+//    ) {
+//        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+//            chatTextSelect_mouseDown = false
+//            ChatTextSelection.finish()
+//        }
+//    }
+
     @Inject(method = ["keyPressed"], at = [At("HEAD")], cancellable = true)
     private fun onKeyPressed(
-        input: KeyInput,
+        event: KeyEvent,
         cir: CallbackInfoReturnable<Boolean>
     ) {
         if (!ChatTextSelectState.enabled) return
 
-        if (input.isCopy && ChatTextSelection.hasSelection()) {
+        val keyCode = chatTextSelect_keyEventInt(
+            event,
+            "key",
+            "keyCode",
+            "keycode",
+            "getKey",
+            "getKeyCode"
+        ) ?: return
+
+        val modifiers = chatTextSelect_keyEventInt(
+            event,
+            "modifiers",
+            "mods",
+            "getModifiers"
+        ) ?: 0
+
+        val isCopy = keyCode == GLFW.GLFW_KEY_C &&
+                modifiers and GLFW.GLFW_MOD_CONTROL != 0
+
+        if (isCopy && ChatTextSelection.hasSelection()) {
             ChatTextSelection.copyToClipboard(chatTextSelect_client())
             cir.returnValue = true
         }
     }
 
-    @Unique
-    private fun chatTextSelect_scrollOffset(): Int {
-        val client = chatTextSelect_client()
-        val accessor = client.inGameHud.chatHud as ChatHudAccessor
-        return accessor.chatTextSelect_getScrolledLines()
-    }
-
-    @Inject(method = ["render"], at = [At("TAIL")])
-    private fun onRender(
-        context: DrawContext,
-        mouseX: Int,
-        mouseY: Int,
-        deltaTicks: Float,
-        ci: CallbackInfo
-    ) {
-        if (!ChatTextSelectState.enabled) return
-
-        val client = chatTextSelect_client()
-        val lines = chatTextSelect_plainLines()
-        val scale = chatTextSelect_chatScale()
-
-        val scrollOffset = chatTextSelect_scrollOffset()
-
-        val leftPressed = GLFW.glfwGetMouseButton(
-            client.window.handle,
-            GLFW.GLFW_MOUSE_BUTTON_LEFT
-        ) == GLFW.GLFW_PRESS
-
-        if (!leftPressed) {
-            chatTextSelect_mouseDown = false
-        }
-
-        if (leftPressed) {
-            val localX = (mouseX - chatTextSelect_chatLeft()) / scale
-            val localYFromBottom = (chatTextSelect_chatBottom() - mouseY) / scale
-
-            val visualLineIndex = ChatTextSelection.mouseToLine(
-                localYFromBottom,
-                chatTextSelect_lineHeight(),
-                lines.size
-            )
-
-            val lineIndex = if (visualLineIndex != null) {
-                visualLineIndex + scrollOffset
-            } else {
-                null
-            }
-
-            if (lineIndex != null) {
-                val line = lines[lineIndex].text
-
-                val charIndex = ChatTextSelection.mouseToChar(
-                    client.textRenderer,
-                    line,
-                    localX
-                )
-
-                val movedX = mouseX - chatTextSelect_startMouseX
-                val movedY = mouseY - chatTextSelect_startMouseY
-                val movedDistanceSq = movedX * movedX + movedY * movedY
-
-                if (
-                    chatTextSelect_mouseDown &&
-                    movedDistanceSq >= chatTextSelect_dragThreshold * chatTextSelect_dragThreshold
-                ) {
-                    ChatTextSelection.dragIfMoved(
-                        lines,
-                        lineIndex,
-                        charIndex
-                    )
-                }
-            }
-        }
-
-        ChatTextSelection.renderSelection(
-            context,
-            client.textRenderer,
-            lines,
-            chatTextSelect_chatLeft(),
-            chatTextSelect_chatBottom(),
-            chatTextSelect_lineHeight(),
-            scale,
-            scrollOffset
-        )
-    }
+//    @Inject(method = ["render"], at = [At("TAIL")])
+//    private fun onRender(
+//        graphics: Any,
+//        mouseX: Int,
+//        mouseY: Int,
+//        deltaTicks: Float,
+//        ci: CallbackInfo
+//    ) {
+//        if (!ChatTextSelectState.enabled) return
+//
+//        val client = chatTextSelect_client()
+//        val lines = chatTextSelect_plainLines()
+//        val scale = chatTextSelect_chatScale()
+//
+//        val scrollOffset = chatTextSelect_scrollOffset()
+//
+//        if (chatTextSelect_mouseDown) {
+//            val localX = (mouseX - chatTextSelect_chatLeft()) / scale
+//            val localYFromBottom = (chatTextSelect_chatBottom() - mouseY) / scale
+//
+//            val visualLineIndex = ChatTextSelection.mouseToLine(
+//                localYFromBottom,
+//                chatTextSelect_lineHeight(),
+//                lines.size
+//            )
+//
+//            val lineIndex = if (visualLineIndex != null) {
+//                visualLineIndex + scrollOffset
+//            } else {
+//                null
+//            }
+//
+//            if (lineIndex != null && lineIndex in lines.indices) {
+//                val line = lines[lineIndex].text
+//
+//                val charIndex = ChatTextSelection.mouseToChar(
+//                    client.font,
+//                    line,
+//                    localX
+//                )
+//
+//                val movedX = mouseX - chatTextSelect_startMouseX
+//                val movedY = mouseY - chatTextSelect_startMouseY
+//                val movedDistanceSq = movedX * movedX + movedY * movedY
+//
+//                if (movedDistanceSq >= chatTextSelect_dragThreshold * chatTextSelect_dragThreshold) {
+//                    ChatTextSelection.dragIfMoved(
+//                        lines,
+//                        lineIndex,
+//                        charIndex
+//                    )
+//                }
+//            }
+//
+//            chatTextSelect_mouseDown = false
+//            ChatTextSelection.finish()
+//        }
+//
+//        ChatTextSelection.renderSelection(
+//            graphics,
+//            client.font,
+//            lines,
+//            chatTextSelect_chatLeft(),
+//            chatTextSelect_chatBottom(),
+//            chatTextSelect_lineHeight(),
+//            scale,
+//            scrollOffset
+//        )
+//    }
 }

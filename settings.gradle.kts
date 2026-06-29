@@ -8,6 +8,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+
     repositories {
         maven("https://maven.fabricmc.net/")
         mavenCentral()

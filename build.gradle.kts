@@ -1,6 +1,6 @@
 plugins {
-    id("fabric-loom") version "1.14-SNAPSHOT"
-    kotlin("jvm") version "2.1.21"
+    id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
+    kotlin("jvm") version "2.4.0"
 }
 
 version = property("mod_version") as String
@@ -18,15 +18,9 @@ repositories {
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
 
-    mappings("net.fabricmc:yarn:${property("yarn_mappings")}:v2")
-
-    modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
-
-    modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
-
-    modImplementation(
-        "net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}"
-    )
+    implementation("net.fabricmc:fabric-loader:${property("loader_version")}")
+    implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
+    implementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
 }
 
 tasks.processResources {
@@ -37,6 +31,15 @@ tasks.processResources {
     }
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(25)
+}
+
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(25)
 }

@@ -1,19 +1,21 @@
 package ru.mrdire.chatselect.mixin
 
-import net.minecraft.client.gui.hud.ChatHud
-import net.minecraft.client.gui.hud.ChatHudLine
+import net.minecraft.client.gui.components.ChatComponent
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.gen.Accessor
 import org.spongepowered.asm.mixin.gen.Invoker
 
-@Mixin(ChatHud::class)
+@Mixin(ChatComponent::class)
 interface ChatHudAccessor {
-    @Accessor("visibleMessages")
-    fun chatTextSelect_getVisibleMessages(): MutableList<ChatHudLine.Visible>
+    @Accessor("trimmedMessages")
+    fun chatTextSelect_getTrimmedMessages(): MutableList<Any>
 
-    @Accessor("scrolledLines")
-    fun chatTextSelect_getScrolledLines(): Int
+    @Accessor("chatScrollbarPos")
+    fun chatTextSelect_getChatScrollbarPos(): Int
 
     @Invoker("getLineHeight")
     fun chatTextSelect_getLineHeight(): Int
+
+    @Invoker("getScale")
+    fun chatTextSelect_getScale(): Double
 }
