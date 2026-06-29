@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.gui.screens.Screen
+import org.lwjgl.glfw.GLFW
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Unique
 import org.spongepowered.asm.mixin.injection.At
@@ -27,7 +28,6 @@ abstract class ScreenRenderMixin {
 
         if (!ChatTextSelectState.enabled) return
         if (client.screen !is ChatScreen) return
-        if (!ChatTextSelection.hasSelection()) return
 
         val chatAccessor = client.gui.chat as ChatHudAccessor
 
@@ -42,6 +42,50 @@ abstract class ScreenRenderMixin {
         val chatLeft = 1
         val chatBottom = client.window.guiScaledHeight - 40
 
+        val windowHandle = chatTextSelect_windowHandle(client)
+
+        val leftMouseDown =
+            windowHandle != 0L &&
+                    GLFW.glfwGetMouseButton(
+                        windowHandle,
+                        GLFW.GLFW_MOUSE_BUTTON_LEFT
+                    ) == GLFW.GLFW_PRESS
+
+        if (leftMouseDown) {
+            val localX = (mouseX - chatLeft) / chatScale
+            val localYFromBottom = (chatBottom - mouseY) / chatScale
+
+            val visualLineIndex = ChatTextSelection.mouseToLine(
+                localYFromBottom,
+                lineHeight,
+                lines.size
+            )
+
+            if (visualLineIndex != null) {
+                val lineIndex = visualLineIndex + scrollOffset
+
+                if (lineIndex in lines.indices) {
+                    val line = lines[lineIndex].text
+
+                    val charIndex = ChatTextSelection.mouseToChar(
+                        client.font,
+                        line,
+                        localX
+                    )
+
+                    ChatTextSelection.dragIfMoved(
+                        lines,
+                        lineIndex,
+                        charIndex
+                    )
+                }
+            }
+        } else {
+            ChatTextSelection.finish()
+        }
+
+        if (!ChatTextSelection.hasSelection()) return
+
         ChatTextSelection.renderSelection(
             graphics,
             client.font,
@@ -52,5 +96,29 @@ abstract class ScreenRenderMixin {
             chatScale,
             scrollOffset
         )
+    }
+
+    @Unique
+    private fun chatTextSelect_windowHandle(client: Minecraft): Long {
+        val window = client.window
+
+        val method = window.javaClass.methods.firstOrNull {
+            it.parameterCount == 0 &&
+                    it.returnType == Long::class.javaPrimitiveType &&
+                    (
+                            it.name == "handle" ||
+                                    it.name == "getWindow" ||
+                                    it.name == "getWindowHandle" ||
+                                    it.name == "getHandle"
+                            )
+        } ?: return 0L
+
+        val value = method.invoke(window)
+
+        return if (value is Number) {
+            value.toLong()
+        } else {
+            0L
+        }
     }
 }

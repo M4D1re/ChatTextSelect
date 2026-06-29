@@ -277,12 +277,13 @@ abstract class ChatScreenMixin {
 
             println("ChatTextSelect selected word")
         } else {
-            ChatTextSelection.selectLine(
+            ChatTextSelection.prepare(
                 lines,
-                lineIndex
+                lineIndex,
+                charIndex
             )
 
-            println("ChatTextSelect selected line: ${line}")
+            println("ChatTextSelect selection started: lineIndex=$lineIndex, charIndex=$charIndex")
         }
     }
 
