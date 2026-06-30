@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import ru.mrdire.chatselect.ChatTextSelectState
 import ru.mrdire.chatselect.ChatTextSelection
 
+import ru.mrdire.chatselect.ChatTextSelectDragState
+
 @Mixin(Screen::class)
 abstract class ScreenRenderMixin {
 
@@ -73,14 +75,21 @@ abstract class ScreenRenderMixin {
                         localX
                     )
 
-                    ChatTextSelection.dragIfMoved(
-                        lines,
-                        lineIndex,
-                        charIndex
-                    )
+                    if (ChatTextSelectDragState.hasMovedEnough(
+                            mouseX.toDouble(),
+                            mouseY.toDouble()
+                        )
+                    ) {
+                        ChatTextSelection.dragIfMoved(
+                            lines,
+                            lineIndex,
+                            charIndex
+                        )
+                    }
                 }
             }
         } else {
+            ChatTextSelectDragState.stop()
             ChatTextSelection.finish()
         }
 

@@ -17,6 +17,9 @@ import net.minecraft.client.input.KeyEvent
 
 import org.slf4j.LoggerFactory
 
+import ru.mrdire.chatselect.ChatTextSelectDragState
+
+
 @Mixin(ChatScreen::class)
 abstract class ChatScreenMixin {
 
@@ -198,6 +201,52 @@ abstract class ChatScreenMixin {
         return null
     }
 
+    @Unique
+    private fun chatTextSelect_isClickableChatComponent(
+        mouseX: Double,
+        mouseY: Double
+    ): Boolean {
+        val client = chatTextSelect_client()
+        val chat = client.gui.chat
+
+        val possibleMethods = listOf(
+            "getClickedComponentStyleAt",
+            "getComponentStyleAt",
+            "getTextStyleAt"
+        )
+
+        for (methodName in possibleMethods) {
+            val method = chat.javaClass.methods.firstOrNull {
+                it.name == methodName &&
+                        it.parameterCount == 2 &&
+                        it.parameterTypes[0] == Double::class.javaPrimitiveType &&
+                        it.parameterTypes[1] == Double::class.javaPrimitiveType
+            } ?: continue
+
+            val style = method.invoke(chat, mouseX, mouseY) ?: continue
+
+            val hasClickEvent = style.javaClass.methods.any {
+                it.name == "getClickEvent" &&
+                        it.parameterCount == 0
+            }
+
+            if (!hasClickEvent) continue
+
+            val clickEvent = style.javaClass.methods
+                .firstOrNull {
+                    it.name == "getClickEvent" &&
+                            it.parameterCount == 0
+                }
+                ?.invoke(style)
+
+            if (clickEvent != null) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     @Inject(method = ["mouseClicked"], at = [At("HEAD")], cancellable = false)
     private fun onMouseClicked(
         event: MouseButtonEvent,
@@ -242,6 +291,12 @@ abstract class ChatScreenMixin {
 
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return
 
+        if (chatTextSelect_isClickableChatComponent(mouseX, mouseY)) {
+            ChatTextSelection.clear()
+            println("ChatTextSelect ignored clickable chat component")
+            return
+        }
+
         val client = chatTextSelect_client()
         val lines = chatTextSelect_plainLines()
         val scale = chatTextSelect_chatScale()
@@ -269,6 +324,8 @@ abstract class ChatScreenMixin {
         )
 
         if (doubled) {
+            ChatTextSelectDragState.stop()
+
             ChatTextSelection.selectWord(
                 lines,
                 lineIndex,
@@ -277,13 +334,15 @@ abstract class ChatScreenMixin {
 
             println("ChatTextSelect selected word")
         } else {
+            ChatTextSelectDragState.start(mouseX, mouseY)
+
             ChatTextSelection.prepare(
                 lines,
                 lineIndex,
                 charIndex
             )
 
-            println("ChatTextSelect selection started: lineIndex=$lineIndex, charIndex=$charIndex")
+            println("ChatTextSelect selection prepared: lineIndex=$lineIndex, charIndex=$charIndex")
         }
     }
 
