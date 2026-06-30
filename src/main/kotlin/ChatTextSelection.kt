@@ -141,6 +141,21 @@ object ChatTextSelection {
         selectedSnapshotText = line
     }
 
+    private fun normalizeVisualRange(
+        a: Pair<Int, Int>,
+        b: Pair<Int, Int>
+    ): Pair<Pair<Int, Int>, Pair<Int, Int>> {
+        val aBeforeB =
+            a.first > b.first ||
+                    a.first == b.first && a.second <= b.second
+
+        return if (aBeforeB) {
+            a to b
+        } else {
+            b to a
+        }
+    }
+
     private fun resolvePos(pos: Pos, lines: List<VisibleLine>): Pair<Int, Int>? {
         val byIdentity = lines.indexOfFirst {
             it.id.identityHash == pos.lineId.identityHash
@@ -169,24 +184,47 @@ object ChatTextSelection {
         val a = resolvePos(aRaw, lines) ?: return selectedSnapshotText
         val b = resolvePos(bRaw, lines) ?: return selectedSnapshotText
 
-        val from: Pair<Int, Int>
-        val to: Pair<Int, Int>
+        val normalized = normalizeVisualRange(a, b)
 
-        if (a.first < b.first || a.first == b.first && a.second <= b.second) {
-            from = a
-            to = b
-        } else {
-            from = b
-            to = a
-        }
+        val top = normalized.first
+        val bottom = normalized.second
 
         val result = StringBuilder()
 
-        for (lineIndex in from.first..to.first) {
+        val lineRange =
+            if (top.first >= bottom.first) {
+                top.first downTo bottom.first
+            } else {
+                top.first..bottom.first
+            }
+
+        for (lineIndex in lineRange) {
             val line = lines.getOrNull(lineIndex)?.text ?: continue
 
-            val startChar = if (lineIndex == from.first) from.second else 0
-            val endChar = if (lineIndex == to.first) to.second else line.length
+            val startChar: Int
+            val endChar: Int
+
+            if (top.first == bottom.first) {
+                startChar = min(top.second, bottom.second)
+                endChar = max(top.second, bottom.second)
+            } else {
+                when (lineIndex) {
+                    top.first -> {
+                        startChar = top.second
+                        endChar = line.length
+                    }
+
+                    bottom.first -> {
+                        startChar = 0
+                        endChar = bottom.second
+                    }
+
+                    else -> {
+                        startChar = 0
+                        endChar = line.length
+                    }
+                }
+            }
 
             val safeStart = startChar.coerceIn(0, line.length)
             val safeEnd = endChar.coerceIn(0, line.length)
@@ -195,7 +233,7 @@ object ChatTextSelection {
                 result.append(line.substring(safeStart, safeEnd))
             }
 
-            if (lineIndex != to.first) {
+            if (lineIndex != bottom.first) {
                 result.append('\n')
             }
         }
@@ -221,25 +259,48 @@ object ChatTextSelection {
         val a = resolvePos(aRaw, lines) ?: return
         val b = resolvePos(bRaw, lines) ?: return
 
-        val from: Pair<Int, Int>
-        val to: Pair<Int, Int>
+        val normalized = normalizeVisualRange(a, b)
 
-        if (a.first < b.first || a.first == b.first && a.second <= b.second) {
-            from = a
-            to = b
-        } else {
-            from = b
-            to = a
-        }
+        val top = normalized.first
+        val bottom = normalized.second
 
-        for (lineIndex in from.first..to.first) {
+        val lineRange =
+            if (top.first >= bottom.first) {
+                top.first downTo bottom.first
+            } else {
+                top.first..bottom.first
+            }
+
+        for (lineIndex in lineRange) {
             val visualLineIndex = lineIndex - scrollOffset
             if (visualLineIndex < 0) continue
 
             val line = lines.getOrNull(lineIndex)?.text ?: continue
 
-            val startChar = if (lineIndex == from.first) from.second else 0
-            val endChar = if (lineIndex == to.first) to.second else line.length
+            val startChar: Int
+            val endChar: Int
+
+            if (top.first == bottom.first) {
+                startChar = min(top.second, bottom.second)
+                endChar = max(top.second, bottom.second)
+            } else {
+                when (lineIndex) {
+                    top.first -> {
+                        startChar = top.second
+                        endChar = line.length
+                    }
+
+                    bottom.first -> {
+                        startChar = 0
+                        endChar = bottom.second
+                    }
+
+                    else -> {
+                        startChar = 0
+                        endChar = line.length
+                    }
+                }
+            }
 
             val safeStart = startChar.coerceIn(0, line.length)
             val safeEnd = endChar.coerceIn(0, line.length)
