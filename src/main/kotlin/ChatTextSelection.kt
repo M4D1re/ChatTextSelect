@@ -313,12 +313,11 @@ object ChatTextSelection {
             val x1 = chatLeft + (font.width(before) * chatScale).roundToInt()
             val x2 = chatLeft + (font.width(before + selected) * chatScale).roundToInt()
 
-            val scaledFontHeight = (font.lineHeight * chatScale)
-                .roundToInt()
-                .coerceAtLeast(1)
+            val lineBottom = chatBottom - (visualLineIndex * lineHeight * chatScale).roundToInt()
+            val lineTop = chatBottom - ((visualLineIndex + 1) * lineHeight * chatScale).roundToInt()
 
-            val y2 = chatBottom - (visualLineIndex * lineHeight * chatScale).roundToInt()
-            val y1 = y2 - scaledFontHeight
+            val y1 = lineTop
+            val y2 = lineBottom
 
             fill(
                 graphics,
